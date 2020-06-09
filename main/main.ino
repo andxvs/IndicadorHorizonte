@@ -11,7 +11,6 @@
 #include <AccelerometerAngle.h>
 // Define variables for code
 #define BNO055_SAMPLERATE_DELAY_MS (100)
-#define SERIAL_SPEED_RATE 115200
 #define SDO 11
 #define SDI 4
 #define SCLK 13
@@ -51,59 +50,64 @@ PrintLine DD(X0,Y0,X1,Y1,Yoffset);
 
 void setup()
 {
-    //Inicializacion de la comunicacion mediante I2C
-    //entre el Arduino y el IMU
-    Serial.begin(SERIAL_SPEED_RATE);
+    // Established communication between the Arduino and the IMU with I2C protocolo
     IMU.begin();
+    //Set LCD display font
     LCD.setFont(u8g_font_6x10);
-    //Inicializacion del CrystalUse
+    //Crystal use initialization for the LCD display 
     IMU.setExtCrystalUse(true);
+    // capture the system time
     system_time= millis();
+    // Draw the center point of in the LCD screen 
     LCD.drawPixel(42,42);
     
 }
 
 void loop()
 {
-    // Formato de (&variable) es para pasar variables de forma de funcion
+    // System Calibration for the IMU, this method object will return the system calibration
     IMU.getCalibration(&sys, &accelerometer, &magnetometer, &gyroscope);
 
-    //Recopilar datos de acelerometro
+    // Request accelerometer data from the IMU
     imu::Vector<3> accel = IMU.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
 
-    //Recopilar datos de giroscopio
+    // Request gyroscope data from the IMU
     imu::Vector<3> gyro = IMU.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
 
-    //Recopilar datos de magnetometro
+    // Request magnetometer data from the IMU
     //imu::Vector<3> magnet = IMU.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);
 
-    //Impresion de variables de acelerometro, giroscopio y magntometro
+    // Save accelerometer angles in two variables
     AccPitch = Pitch.pitch_acc(accel.x(),accel.z());
     AccRoll = Roll.roll_acc(accel.y(),accel.z());
-
+    
+    //define the delta time in seconds to calculate the gyroscope
     dt = (millis()-system_time)/1000.;
 
+    // Save gyroscope angles in two variables
     GyrPitch = GyroPitch.pitch_gyro(gyro.y(),dt,GyrPitch);
     GyrRoll = GyroRoll.roll_gyro(gyro.x(),dt,GyrRoll);
 
-    // Complementary Filter
+    // Complementary Filter to improve angle measurements
 
-    // System angles
+    // Filtered angle systems
     SystemPitch = SysPitch.FilteredPitch(SystemPitch,gyro.y(),dt,AccPitch);
     SystemRoll = SysRoll.FilteredRoll(SystemRoll,gyro.x(),dt,AccRoll);
     
+    // Assign into variables the cardinal points for each of the angles lines
     Yoffset = SysOffset.yoffset(SystemPitch);
     int a = A.xvalue1(SystemRoll);
     int b = B.yvalue1(SystemRoll);
     int c = C.xvalue2(SystemRoll);
     int d = D.yvalue2(SystemRoll);
 
+    // Assign the each of the 4 points of the line to be sent to the LCD Screen print
     X0 = AA.x0_val(a,b,c,d,Yoffset);
     Y0 = BB.y0_val(a,b,c,d,Yoffset);
     X1 = CC.x1_val(a,b,c,d,Yoffset);
     Y1 = DD.y1_val(a,b,c,d,Yoffset);
 
-    LCD.firstPage(); // Beginning of the picture loop
+    LCD.firstPage(); // Beginning of the picture loop for the LCD print screen
     do  // Include all you want to show on the display:
     {
       LCD.drawLine(X0, Y0, X1, Y1);  // Draw a line (x0,y0,x1,y1)
@@ -112,6 +116,8 @@ void loop()
 
     // System delays and time new definition
     delay(BNO055_SAMPLERATE_DELAY_MS);
+    
+    // Define new time count to start with the new cycle
     system_time = millis();
     
 }
